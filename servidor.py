@@ -78,7 +78,7 @@ class RedVidaHandler(SimpleHTTPRequestHandler):
             return self.reply(200,{'server':'redvida-local','reports':[{'report':json.loads(r[1]),'receipt':self.receipt(r)} for r in rows]})
         # No exponer la base de datos, código del receptor, archivos de pruebas o listados.
         target=Path(self.translate_path(route)).resolve()
-        if not target.is_relative_to(ROOT) or (target.relative_to(ROOT).parts[:1]==('data',) or (target.relative_to(ROOT).parts[:1]==('tests',) and not getattr(self.server,'allow_tests',False))) or (target.is_file() and target.suffix not in {'.html','.css','.js','.svg','.png','.webmanifest','.txt'}):
+        if not target.is_relative_to(ROOT) or (target.relative_to(ROOT).parts[:1]==('data',) or (target.relative_to(ROOT).parts[:1]==('tests',) and not getattr(self.server,'allow_tests',False))) or (target.is_file() and target.suffix not in {'.html','.css','.js','.svg','.png','.jpg','.avif','.webp','.ico','.webmanifest','.txt'}):
             return self.reply(404,{'error':'Recurso no disponible'})
         super().do_GET()
     def list_directory(self,path):
