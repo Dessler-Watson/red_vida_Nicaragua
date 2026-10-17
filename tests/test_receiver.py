@@ -28,6 +28,15 @@ class ReceiverTests(unittest.TestCase):
   r=self.report('RVN-TEST-INVALID');r['injured']=-1;self.assertEqual(self.post(r)[0],400);r['injured']=0;self.assertEqual(self.post(r,Origin='https://otro.example')[0],403)
  def test_e_receipt_survives_database_reopen(self):
   r=self.report('RVN-TEST-PERSIST');receipt=self.post(r)[1];receiver.prepare_database(Path(self.tmp.name)/'reports.sqlite3');self.assertEqual(self.post(r)[1],receipt)
+ def test_mobile_name_and_unknown_counts_survive_retry(self):
+  r=self.report('RVN-TEST-MOBILE-NAME');r.update(reporterName='Persona ficticia de prueba',countsUnknown=True,affectedPeople=0,injured=0,trapped=0)
+  self.assertEqual(self.post(r)[0],201);self.assertEqual(self.post(r)[0],200)
+  data=json.load(urllib.request.urlopen(self.url+'/api/reports'));stored=next(e['report'] for e in data['reports'] if e['report']['id']==r['id'])
+  self.assertEqual(stored['reporterName'],r['reporterName']);self.assertTrue(stored['countsUnknown'])
+ def test_static_offline_design_resources(self):
+  for path,mime in [('/assets/images/inundacion.webp','image/webp'),('/assets/fonts/inter-latin.woff2','font/woff2'),('/assets/vendor/lucide.min.js','javascript')]:
+   with urllib.request.urlopen(self.url+path) as response:
+    self.assertEqual(response.status,200);self.assertIn(mime,response.headers['Content-Type']);self.assertGreater(len(response.read()),100)
  def test_f_no_private_files(self):
   for path in ['/servidor.py','/%64ata/redvida.sqlite3','/assets/../data/redvida.sqlite3']:
    with self.assertRaises(urllib.error.HTTPError) as context:urllib.request.urlopen(self.url+path)

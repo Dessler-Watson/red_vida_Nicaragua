@@ -1,0 +1,7 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {"name": "RedVida: app ciudadana", "type": "msedge", "request": "launch", "url": "http://localhost:8080/index.html", "webRoot": "${workspaceFolder}"},
+    {"name": "RedVida: administrador", "type": "msedge", "request": "launch", "url": "http://localhost:8080/sinapred.html", "webRoot": "${workspaceFolder}"}
+  ]
+}

@@ -6,8 +6,8 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f7faf8",
-  "theme_color": "#dcf6e9",
+  "background_color": "#F5F8F6",
+  "theme_color": "#063D32",
   "icons": [
     {
       "src": "assets/icon-192.png",
@@ -21,5 +21,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "description": "Tecnología que conecta vidas. Reportes de emergencia con guardado offline."
 }

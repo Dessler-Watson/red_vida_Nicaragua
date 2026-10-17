@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "RedVida: iniciar servidor",
+    "type": "process",
+    "command": "C:\\Users\\User\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "args": ["${workspaceFolder}/iniciar-vscode.py"],
+    "options": {"cwd": "${workspaceFolder}"},
+    "problemMatcher": [],
+    "group": {"kind": "build", "isDefault": true},
+    "presentation": {"reveal": "always", "panel": "dedicated"}
+  }]
+}

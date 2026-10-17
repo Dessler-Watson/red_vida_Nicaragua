@@ -2,7 +2,7 @@
 No es infraestructura oficial de SINAPRED. Mantener en loopback para desarrollo.
 Despliegue público requiere HTTPS, autenticación, autorización y política de datos.
 """
-import argparse, base64, hashlib, json, re, sqlite3, uuid
+import argparse, base64, hashlib, json, re, sqlite3, uuid, sys
 from datetime import datetime, timezone
 from contextlib import closing
 from functools import partial
@@ -11,10 +11,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
+from alertas import DemoEvents, prepare as prepare_events
 MAX_BODY = 10 * 1024 * 1024
 TYPES = {'Inundación','Terremoto','Deslizamiento','Tormenta o huracán','Otro fenómeno natural'}
 NEEDS = {'Atención médica','Agua','Alimentos','Refugio','Evacuación','Otras'}
-FIELDS = {'id','createdAt','disasterType','location','latitude','longitude','coordinateSource','description','affectedPeople','injured','trapped','needs','damage','photo','accuracy','source','demoOrigin','status','priority','verificationStatus','locationVerification','assignmentStatus','followUp'}
+FIELDS = {'reporterName','countsUnknown','id','createdAt','disasterType','location','latitude','longitude','coordinateSource','description','affectedPeople','injured','trapped','needs','damage','photo','accuracy','source','demoOrigin','status','priority','verificationStatus','locationVerification','assignmentStatus','followUp'}
 
 def prepare_database(path):
     path = Path(path)
@@ -22,6 +24,7 @@ def prepare_database(path):
     with closing(sqlite3.connect(path)) as db:
         db.execute('PRAGMA journal_mode=WAL')
         db.execute('CREATE TABLE IF NOT EXISTS reports (report_id TEXT PRIMARY KEY, payload TEXT NOT NULL, digest TEXT NOT NULL, receipt_id TEXT UNIQUE NOT NULL, received_at TEXT NOT NULL)')
+        prepare_events(db)
         db.commit()
 
 def validated_report(value):
@@ -29,6 +32,8 @@ def validated_report(value):
     r = {k:v for k,v in value.items() if k in FIELDS}
     if not isinstance(r.get('id'),str) or not re.fullmatch(r'RVN-[A-Z0-9-]{1,100}',r['id']): raise ValueError('ID inválido')
     if r.get('disasterType') not in TYPES: raise ValueError('Tipo inválido')
+    if 'reporterName' in r and (not isinstance(r['reporterName'],str) or len(r['reporterName'])>120): raise ValueError('Nombre inválido')
+    if 'countsUnknown' in r and type(r['countsUnknown']) is not bool: raise ValueError('Indicador inválido')
     location=r.get('location')
     if not isinstance(location,dict): raise ValueError('Ubicación inválida')
     for key,limit in [('department',100),('municipality',100),('community',180)]:
@@ -52,6 +57,8 @@ def validated_report(value):
     return r
 
 class RedVidaHandler(SimpleHTTPRequestHandler):
+    # Windows MIME registries differ; serve packaged mobile assets consistently.
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.webp': 'image/webp', '.woff2': 'font/woff2', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json'}
     def __init__(self,*args,database,**kwargs):
         self.database=database
         super().__init__(*args,directory=str(ROOT),**kwargs)
@@ -72,19 +79,23 @@ class RedVidaHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         route=urlsplit(self.path).path
         if route=='/api/health': return self.reply(200,{'server':'redvida-local','status':'ready'})
+        if route=='/api/demo-events':
+            try: return self.reply(200,{'server':'redvida-local','demonstration':True,'events':DemoEvents(self.database).recent()})
+            except sqlite3.Error: return self.reply(503,{'error':'Eventos temporalmente no disponibles'})
         if route=='/api/reports':
             with closing(sqlite3.connect(self.database,timeout=20)) as db:
                 rows=db.execute('SELECT * FROM reports ORDER BY received_at DESC').fetchall()
             return self.reply(200,{'server':'redvida-local','reports':[{'report':json.loads(r[1]),'receipt':self.receipt(r)} for r in rows]})
         # No exponer la base de datos, código del receptor, archivos de pruebas o listados.
         target=Path(self.translate_path(route)).resolve()
-        if not target.is_relative_to(ROOT) or (target.relative_to(ROOT).parts[:1]==('data',) or (target.relative_to(ROOT).parts[:1]==('tests',) and not getattr(self.server,'allow_tests',False))) or (target.is_file() and target.suffix not in {'.html','.css','.js','.svg','.png','.jpg','.avif','.webp','.ico','.webmanifest','.txt'}):
+        if not target.is_relative_to(ROOT) or (target.relative_to(ROOT).parts[:1]==('data',) or (target.relative_to(ROOT).parts[:1]==('tests',) and not getattr(self.server,'allow_tests',False))) or (target.is_file() and target.suffix not in {'.html','.css','.js','.svg','.png','.jpg','.avif','.webp','.ico','.woff2','.webmanifest','.txt'}):
             return self.reply(404,{'error':'Recurso no disponible'})
         super().do_GET()
     def list_directory(self,path):
         self.send_error(404,'No se permiten listados de directorio')
     def do_POST(self):
-        if urlsplit(self.path).path!='/api/reports': return self.reply(404,{'error':'Ruta no disponible'})
+        route=urlsplit(self.path).path
+        if route not in ('/api/reports','/api/demo-events'): return self.reply(404,{'error':'Ruta no disponible'})
         origin=self.headers.get('Origin')
         if origin and urlsplit(origin).netloc!=self.headers.get('Host'): return self.reply(403,{'error':'Origen no permitido'})
         if self.headers.get_content_type()!='application/json': return self.reply(415,{'error':'Se requiere JSON'})
@@ -92,6 +103,9 @@ class RedVidaHandler(SimpleHTTPRequestHandler):
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=MAX_BODY: return self.reply(413,{'error':'Tamaño inválido'})
             payload=json.loads(self.rfile.read(size),parse_constant=lambda _: (_ for _ in ()).throw(ValueError('Número no finito')))
+            if route=='/api/demo-events':
+                status,body=DemoEvents(self.database).mutate(payload,self.headers.get('Idempotency-Key'))
+                return self.reply(status,body)
             if payload.get('schemaVersion')!=1: raise ValueError('Versión incompatible')
             report=validated_report(payload.get('report'))
             if self.headers.get('Idempotency-Key')!=report['id']: raise ValueError('Clave de idempotencia inválida')

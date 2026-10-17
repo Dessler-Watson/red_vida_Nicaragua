@@ -1,5 +1,7 @@
 # RedVida Nicaragua — app móvil offline y receptor de reportes
 
+El informe general del proyecto, el reto 09, las funciones implementadas, las pruebas y los límites de esta entrega está en [INFORME_PROYECTO_REDVIDA.md](INFORME_PROYECTO_REDVIDA.md).
+
 ## Entorno elegido
 
 La app ciudadana es una **PWA instalable**, creada con HTML, CSS y JavaScript puro. Se conserva el proyecto de `C:\Users\User\Desktop\RedVida Nicaragua`, su formulario y el panel administrativo. No se ha generado un APK ni se requiere Android Studio para esta etapa.
@@ -46,7 +48,7 @@ Para esta etapa mantenemos la PWA porque reutiliza toda la interfaz actual. Si d
 
 ## Diseño ciudadano
 
-Inicio de fondo menta, ilustración animada de conexión comunitaria, accesos táctiles por tipo de desastre, botón coral destacado, navegación inferior y confirmaciones breves. El radar es una **ilustración**, no un mapa, rastreo en vivo ni un índice de seguridad real. Todas las acciones llevan al formulario; no se ha creado un falso botón de atención SOS inmediata. Se respetan las preferencias de movimiento reducido.
+Inicio editorial en verde profundo, símbolo vectorial propio de pulso, corazón y protección, señales animadas y botón coral. Selección fotográfica por desastre, cuatro pasos, confirmación con acuse real, historial con búsqueda y consejos desplegables. Fuentes Manrope/Inter, Lucide y fotos WebP se cargan desde archivos locales. Se respeta `prefers-reduced-motion`. Las fotografías son de referencia; no representan reportes ni sucesos actuales en Nicaragua. Créditos y licencias en `assets/CREDITS.md`.
 
 ## Flujo de guardado y envío
 
@@ -154,3 +156,57 @@ El receptor actual es de desarrollo y funciona por defecto únicamente en esta c
 | Inventario y asignaciones de demostración guardados localmente | Sincronización de decisiones operativas entre varios operadores y hacia el teléfono |
 | Solicitud de Background Sync cuando existe soporte | Garantía universal de envío con app cerrada; requeriría evaluar capacidades nativas y del sistema |
 | Leaflet incluido localmente y marcadores con datos válidos | Teselas OpenStreetMap online; INETER sin integrar; no hay capa oficial de densidad |
+
+
+
+## Rediseño ciudadano premium (16 de octubre de 2026)
+
+El formulario ahora tiene cuatro pasos: categoría fotográfica, GPS/referencia manual, situación y revisión. Nombre completo es el único dato personal solicitado; la descripción, cantidades, necesidades y fotografía son opcionales. Con GPS, los campos territoriales son opcionales; sin GPS es necesaria una referencia. Departamento y municipio no informados quedan «Por determinar», sin geocodificación inventada. Las cantidades desconocidas conservan `countsUnknown`; no se interpretan como ausencia de afectados.
+
+Cambios principales: `index.html`, `js/ciudadano.js`, `js/pwa.js`, `css/ciudadano-premium.css`, `sw.js`, `manifest.webmanifest`, `css/identidad.css`, `servidor.py` (formatos estáticos WebP/WOFF2 y MIME), `tests/audit.js`, `tests/test_receiver.py`. El esquema de IndexedDB, la cola, el motor `js/sync.js` y los contratos de recepción permanecen iguales a la versión anterior. Las versiones de JS/CSS en las URLs evitan que un Service Worker anterior combine la nueva página con el formulario viejo.
+
+Recursos añadidos: cuatro fotos WebP optimizadas (aprox. 323 KB en total), `otro.svg`, Manrope e Inter WOFF2 y Lucide 0.468.0 local con licencias. La fotografía de tormenta muestra rayos; la de deslizamiento muestra una ladera erosionada. Todas son ilustrativas.
+
+### Validación del rediseño
+
+- 8 pruebas del receptor: recepción, reintento idempotente, conflicto, concurrencia, validación, persistencia, nombre/indicador de datos faltantes, protección de archivos y recursos estáticos.
+- 15 pruebas de IndexedDB y caché en laboratorio separado; incluye todos los recursos esenciales del rediseño.
+- 6 pruebas de sincronización: pérdida de respuesta después de guardar, mismo acuse sin duplicado, cola atómica, exclusión de demos, importación idempotente y envío automático.
+- Flujo visual de cuatro pasos con referencia manual, necesidades, edición hacia atrás, confirmación real, búsqueda y detalles.
+- Receptor detenido: guardado, recarga desde caché y navegación con cinco imágenes locales cargadas. Al reiniciarlo, el reporte pendiente se recibe automáticamente sin pulsar Enviar.
+- Navegador de escritorio con tamaños móviles/tablet/escritorio; comprobar también en un iPhone físico antes de una presentación pública.
+
+No se ha comprobado aquí instalación real en iOS, permiso y precisión GPS del teléfono, persistencia tras desinstalar/borrar datos, ni envío con la aplicación cerrada. La cartografía OpenStreetMap requiere internet y puede fallar de forma independiente; se puede seguir reportando sin ella.
+
+## RedVida Alerta — simulación colaborativa
+
+Consulta `REDVIDA_ALERTA.md` para la propuesta del reto 09, arquitectura, reglas demostrativas, flujo completo, archivos, pruebas y limitaciones.
+
+En el administrador está «Eventos sísmicos». En la interfaz ciudadana, el bloque «RedVida Alerta» permite activar audio/notificaciones de prueba y consultar eventos. Los nuevos avisos llegan por consulta al receptor cada 4 segundos cuando la página puede ejecutarse y hay conexión. No hay sensores reales ni Web Push configurado; no se garantiza entrega con la aplicación cerrada.
+
+El receptor migra de forma aditiva: crea `demo_events` y `demo_event_actions`, conserva `reports` y añade GET/POST `/api/demo-events`. Requiere reiniciar `servidor.py` tras actualizar el código. Los reportes y la cola existente conservan sus contratos.
+
+Pruebas del módulo: `python -m unittest discover -s tests -p "test_*.py"`; navegador en laboratorio `http://localhost:8081/tests/alerta-test.html`. Para iniciar el laboratorio: `python servidor.py --port 8081 --data RUTA_A_BASE_SEPARADA.sqlite3 --allow-tests`. No reutilizar una base del entorno habitual.
+
+
+## Corrección: alerta roja al iniciar
+
+Consultar [ALERTA_ROJA.md](ALERTA_ROJA.md) para el diagnóstico, acceso desde iPhone, publicación explícita al iniciar, magnitud ficticia, acuses reales del navegador y límites de notificación. La PWA utiliza el mismo origen del receptor y consulta cada 4 s; no hay Web Push configurado con la app cerrada.
+
+## Iniciar desde VS Code: un solo origen
+
+Abre la carpeta RedVida Nicaragua y pulsa **Ctrl+Shift+B**: la tarea **RedVida: iniciar servidor** inicia o reutiliza Python en 8080 y muestra los dos enlaces. Mantén la terminal abierta cuando esté ejecutando el servidor. F5 permite elegir **RedVida: app ciudadana** o **RedVida: administrador** en Microsoft Edge, con el receptor ya iniciado.
+
+Usa ambas interfaces en `http://localhost:8080/index.html` y `http://localhost:8080/sinapred.html`. Live Server (5500) no ejecuta las rutas Python; ahora las entradas HTML en 5500 redirigen a localhost:8080, conservando ruta y consulta. Recarga con Ctrl+Shift+R una vez si la pestaña seguía mostrando la versión anterior. No se borran ni migran automáticamente datos guardados en el origen 5500 o 127.0.0.1; esos almacenamientos continúan separados. El módulo ahora se llama **Eventos sísmicos**, conservando etiquetas de simulación en datos ficticios.
+
+## Alerta premium e informe compacto
+
+Consulta [ALERTA_PREMIUM.md](ALERTA_PREMIUM.md) para el nuevo diseño, formulario de situación con GPS opcional, cola persistente y vínculo automático después del recibo real. El botón Informar a las autoridades explica que el destinatario actual es el receptor de demostración RedVida. Todos los informes originados en ejercicios siguen siendo pruebas. Se conservan las limitaciones de sonido, segundo plano y Web Push.
+
+## Nueva composición de alerta
+
+La versión 40 reemplaza la alerta oscura por una cabecera roja, datos sobre blanco y protección breve. El botón **Informar daños y pedir ayuda** aparece completo en la primera pantalla de 360 × 800. Consulta [ALERTA_CLARA.md](ALERTA_CLARA.md) para archivos y validación. Se conservan el formulario, la cola offline y las limitaciones de notificación.
+
+## Textos ciudadanos y control desde administración
+
+La versión 42 elimina de los textos de interfaz ciudadana Simulación y datos ficticios. Los ejercicios conservan un distintivo Aviso de prueba y Magnitud de prueba. Se quitó la opción ciudadana para marcar un reporte normal como prueba y el botón de recepción simulada. Crear y ejecutar ejercicios sigue en Eventos sísmicos del administrador. Se conservan las marcas internas source/demo/isSimulation para no mezclar pruebas y reportes ciudadanos, los registros históricos y sus recibos. No se reescriben reportes almacenados.
